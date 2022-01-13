@@ -1,0 +1,75 @@
+#!/bin/bash
+
+echo ""
+echo "Welcome to dl404imgs"
+echo ""
+echo "1st argument: the path to a *.har file from your browser (e.g. ~/Downloads/examplehomes.test.har )"
+echo "2nd argument: the path to your local dev environment (e.g. ~/examplehomes/wp-content/uploads/ )"
+echo ""
+echo "This works with bash and requires wget and jq"
+echo "This assumes that the hostname is the same is the live site except your local site ends in *.test and the live site ends in *.com"
+echo ""
+echo "Instructions for Chromium or Firefox based browsers:"
+echo ""
+echo "To use, first go to the local *.test version of the page you are working on"
+echo "Go to your Browser Dev Tools > Network and refresh the page"
+echo "Save HAR file"
+echo "Know the ../wp-content/uploads/ directory for your local environment."
+echo ""
+echo "Example Usage:"
+echo ""
+echo "dl404imgs examplehomes.test.har ~/examplehomes/wp-content/uploads/"
+echo ""
+
+HAR=$1
+UPLOADS=${2%/}
+
+ERRORMESSAGE="[ Error: Missing one or more arguments. ]"
+echo "Input HAR:"
+echo ${HAR:?$ERRORMESSAGE}
+echo ""
+echo "The ../wp-content/uploads directory:"
+echo ${UPLOADS:?$ERRORMESSAGE}
+
+echo ""
+rm -rv /tmp/dl404imgs/
+echo ""
+mkdir -v /tmp/dl404imgs
+echo ""
+
+echo ""
+echo "Image URLs to download:"
+echo ""
+jq .log.entries "${HAR}" | jq 'map(select(.response.status==404))' | jq 'map(.request.url)' | jq sort | jq .[] -r | sed 's/test/com/' | sed '/jpg$\|png$\|svg$/!d' | tee /tmp/dl404imgs/dl404imgs.txt
+echo ""
+echo ""
+echo "Fetching images with wget..."
+echo ""
+wget -v --directory-prefix /tmp/dl404imgs/ --input-file /tmp/dl404imgs/dl404imgs.txt
+echo ""
+echo ""
+echo "Copying images to destination..."
+echo ""
+
+cat /tmp/dl404imgs/dl404imgs.txt | while read line; do
+
+  FILEPATH=$(echo $line | sed 's/^.*uploads\///')
+  DIR="$(dirname "${FILEPATH}")"
+  FILE="$(basename "${FILEPATH}")"
+  DEST=$UPLOADS/$DIR
+  # echo "[${DIR}] [${FILE}]"
+
+  echo ""
+  mkdir -pv $DEST
+  echo ""
+  mv -v /tmp/dl404imgs/$FILE $DEST/
+  echo ""
+
+done
+
+echo ""
+rm -rv /tmp/dl404imgs/
+echo ""
+echo "Done!"
+echo ""
+
